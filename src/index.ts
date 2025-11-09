@@ -33,6 +33,9 @@ app.get(ROUTES.GET_WEBTOONS, getWebtoons);
 
 // Render가 주입하는 포트 사용. 로컬에선 3000 기본값
 const PORT = Number(process.env.PORT) || 3000;
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
 
 async function bootstrap() {
   try {
