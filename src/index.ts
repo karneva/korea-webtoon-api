@@ -33,9 +33,14 @@ app.get(ROUTES.GET_WEBTOONS, getWebtoons);
 
 // Render가 주입하는 포트 사용. 로컬에선 3000 기본값
 const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+
+/* ▼▼▼ 핵심 수정 사항 ▼▼▼ 
+  - 아래의 중복된 app.listen() 호출을 제거합니다.
+  - 데이터베이스가 초기화된 후 bootstrap() 내부에서만 서버를 시작해야 합니다.
+*/
+// app.listen(PORT, () => {
+//   console.log(`Server listening on port ${PORT}`);
+// });
 
 async function bootstrap() {
   try {
@@ -49,9 +54,10 @@ async function bootstrap() {
       UNION ALL
       SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_webtoon
       UNION ALL
-      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_page_webtoon;
+      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGE, freeWaitHour, authors FROM kakao_page_webtoon;
     `);
 
+    // 데이터베이스 초기화 성공 후 서버 시작
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
