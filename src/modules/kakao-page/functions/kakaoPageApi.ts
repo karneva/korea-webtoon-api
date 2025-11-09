@@ -26,11 +26,21 @@ export interface KakoPageLayoutItem {
   // Item fragment에 있는 필요한 다른 필드(title, thumbnail 등)를 추가해야 합니다.
 }
 
+// GraphQL Error 타입 (GraphQL 서버에서 에러 발생 시 반환하는 표준 구조)
+export interface GraphQLError {
+  message: string;
+  locations?: { line: number; column: number }[];
+  path?: string[];
+  extensions?: Record<string, any>;
+}
+
+// 🚨 GetMainLayoutResponse 인터페이스를 수정합니다.
 export interface GetMainLayoutResponse {
+  // 성공 응답 시 포함되는 필드
   data: {
     layout: {
       sections: Array<{
-        type: string; // 섹션 타입 (예: StaticLandingDayOfWeekSection)
+        type: string;
         isEnd?: boolean;
         groups: Array<{
           items: KakoPageLayoutItem[];
@@ -38,6 +48,8 @@ export interface GetMainLayoutResponse {
       }>;
     };
   };
+  // 🚨 에러 응답 시 포함되는 필드를 옵셔널(?)로 추가합니다.
+  errors?: GraphQLError[]; 
 }
 
 /**
