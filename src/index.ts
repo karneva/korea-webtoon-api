@@ -1,50 +1,80 @@
-import express from 'express';
-import { AppDataSource } from './database/datasource';
-import { putKakaoPage } from './routes/update/kakao-page';
-import { putNaver } from './routes/update/naver';
-import swaggerUi from 'swagger-ui-express';
-import { specs } from './swagger';
-import { putKakao } from './routes/update/kakao';
-import { ROUTES } from './constants';
-import { getHealthCheck } from './routes/health-check';
-import { getWebtoons } from './routes/webtoons';
-import cors from 'cors';
+import express from "express";
+import cors from "cors";
+import swaggerUi from "swagger-ui-express";
+
+import { AppDataSource } from "./database/datasource";
+import { specs } from "./swagger";
+import { ROUTES } from "./constants";
+
+import { putNaver } from "./routes/update/naver";
+import { putKakao } from "./routes/update/kakao";
+import { putKakaoPage } from "./routes/update/kakao-page";
+import { getHealthCheck } from "./routes/health-check";
+import { getWebtoons } from "./routes/webtoons";
 
 const app = express();
 
-app.use(cors());
+// 미들웨어는 라우트 등록 전에 선적용
+app.use(cors({ origin: "*" }));
+app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+// Swagger 및 기본 루트
+app.use(ROUTES.SWAGGER, swaggerUi.serve, swaggerUi.setup(specs));
+app.get("/", (_req, res) => res.redirect(ROUTES.SWAGGER));
 
-(async () => {
-  await AppDataSource.initialize();
+// 헬스체크는 가장 가볍게
+app.get(ROUTES.HEALTH_CHECK, getHealthCheck);
 
-  await AppDataSource.query('DROP VIEW IF EXISTS normalized_webtoon');
+// API 라우트
+app.put(ROUTES.UPDATE_NAVER, putNaver);
+app.put(ROUTES.UPDATE_KAKAO, putKakao);
+app.put(ROUTES.UPDATE_KAKAO_PAGE, putKakaoPage);
+app.get(ROUTES.GET_WEBTOONS, getWebtoons);
 
-  await AppDataSource.query(`
-    CREATE VIEW normalized_webtoon AS
-    SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM naver_webtoon
-    UNION ALL
-    SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_webtoon
-    UNION ALL
-    SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_page_webtoon;
-  `);
+// Render가 주입하는 포트 사용. 로컬에선 3000 기본값
+const PORT = Number(process.env.PORT) || 3000;
 
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-  });
+async function bootstrap() {
+  try {
+    await AppDataSource.initialize();
 
-  app.use(ROUTES.SWAGGER, swaggerUi.serve, swaggerUi.setup(specs));
+    // idempotent하게 VIEW 재생성
+    await AppDataSource.query("DROP VIEW IF EXISTS normalized_webtoon");
+    await AppDataSource.query(`
+      CREATE VIEW normalized_webtoon AS
+      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM naver_webtoon
+      UNION ALL
+      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_webtoon
+      UNION ALL
+      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_page_webtoon;
+    `);
 
-  app.put(ROUTES.UPDATE_NAVER, putNaver);
+    const server = app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
 
-  app.put(ROUTES.UPDATE_KAKAO, putKakao);
+    // 그레이스풀 셧다운
+    const shutdown = async (signal: string) => {
+      try {
+        console.log(`${signal} received. Shutting down gracefully...`);
+        server.close();
+        if (AppDataSource.isInitialized) {
+          await AppDataSource.destroy();
+        }
+      } catch (e) {
+        console.error("Error during shutdown:", e);
+      } finally {
+        process.exit(0);
+      }
+    };
 
-  app.put(ROUTES.UPDATE_KAKAO_PAGE, putKakaoPage);
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+  } catch (err) {
+    console.error("Failed to initialize datasource:", err);
+    // 초기화 실패 시 1로 종료하여 Render가 재시작하게 함
+    process.exit(1);
+  }
+}
 
-  app.get(ROUTES.HEALTH_CHECK, getHealthCheck);
-
-  app.get(ROUTES.GET_WEBTOONS, getWebtoons);
-
-  app.get('/', (_, res) => res.redirect(ROUTES.SWAGGER));
-})();
+bootstrap();
