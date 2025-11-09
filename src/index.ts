@@ -49,12 +49,13 @@ async function bootstrap() {
     // idempotent하게 VIEW 재생성
     await AppDataSource.query("DROP VIEW IF EXISTS normalized_webtoon");
     await AppDataSource.query(`
-      CREATE VIEW normalized_webtoon AS
-      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM naver_webtoon
-      UNION ALL
-      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_webtoon
-      UNION ALL
-      SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGE, freeWaitHour, authors FROM kakao_page_webtoon;
+        CREATE VIEW normalized_webtoon AS
+        SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM naver_webtoon
+        UNION ALL
+        SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_webtoon
+        UNION ALL
+        SELECT id, title, provider, updateDays, url, thumbnail, isEnd, isFree, isUpdated, ageGrade, freeWaitHour, authors FROM kakao_page_webtoon;
+        // ageGE -> ageGrade로 수정되었습니다. 
     `);
 
     // 데이터베이스 초기화 성공 후 서버 시작
